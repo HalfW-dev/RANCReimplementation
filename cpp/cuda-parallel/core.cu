@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include <cuda_runtime.h>
+#include <iostream>
 
 // Constructor with CUDA adaptation for Core properties
 Core::Core(int x, int y, int axons_size, int neurons_size, int* weight, int* output) 
@@ -51,16 +52,43 @@ Core::~Core() {
     delete NB;
 }
 
+// Kernel for NeuronIntegrate to be called on the GPU
+__global__ void NeuronIntegrateKernel(int* d_axon_list, int* d_weight_list, int* d_neuron_potentials, int axons_size, int neurons_size) {
+    int neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
+    int axon_index = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (neuron_index < neurons_size && axon_index < axons_size) {
+        int integration_value = d_axon_list[axon_index] * d_weight_list[neuron_index * axons_size + axon_index];
+        atomicAdd(&d_neuron_potentials[neuron_index], integration_value);  // Accumulate potential for each neuron
+    }
+}
+
+// Method to launch NeuronIntegrate kernel
+__host__ void Core::NeuronIntegrate(int* d_axon_list, int* d_weight_list) {
+    dim3 threadsPerBlock(32, 32);
+    dim3 numBlocks((neurons_size + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (axons_size + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    int* d_neuron_potentials;
+    cudaMallocManaged(&d_neuron_potentials, neurons_size * sizeof(int));
+    cudaMemset(d_neuron_potentials, 0, neurons_size * sizeof(int));  // Initialize potentials to zero
+
+    NeuronIntegrateKernel<<<numBlocks, threadsPerBlock>>>(d_axon_list, d_weight_list, d_neuron_potentials, axons_size, neurons_size);
+    
+    // Wait for GPU to finish
+    cudaDeviceSynchronize();
+
+    // Update potentials in the neuron block
+    for (int i = 0; i < neurons_size; ++i) {
+        NB->potential = d_neuron_potentials[i];
+    }
+
+    cudaFree(d_neuron_potentials);
+}
+
 // Implementation of NeuronLeak
 __host__ void Core::NeuronLeak(int index, int leak_value) {
     NB->Leak(index, leak_value);
-}
-
-// Implementation of NeuronIntegrate
-__host__ void Core::NeuronIntegrate(int* d_axon_list, int* d_weight_list, int neuron_index, int axon_index) {
-    // Integrate axon and weight data into neuron potential using CUDA
-    int integration_value = d_axon_list[axon_index] * d_weight_list[neuron_index * axons_size + axon_index];
-    NB->potential += integration_value;
 }
 
 // Implementation of NeuronFire
@@ -71,7 +99,6 @@ __host__ void Core::NeuronFire(int* d_neuron_list, int index, int threshold, int
 
 // Method to load data from queue
 __host__ void Core::loadFromQueue() {
-    // Copy the queue to the axons
     cudaMemcpy(d_axons, d_queue, axons_size * sizeof(int), cudaMemcpyDeviceToDevice);
 }
 

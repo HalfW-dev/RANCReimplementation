@@ -38,8 +38,8 @@ public:
     // Leak method to adjust potential with a leak value using CUDA
     __host__ void NeuronLeak(int index, int leak_value);
 
-    // Integrate method for combining axon inputs and weights into the neuron potential using CUDA
-    __host__ void NeuronIntegrate(int* d_axon_list, int* d_weight_list, int neuron_index, int axon_index);
+    // Integrate method now launches a kernel
+    __host__ void NeuronIntegrate(int* d_axon_list, int* d_weight_list);
 
     // Fire method to determine if a neuron should fire based on potential and threshold using CUDA
     __host__ void NeuronFire(int* d_neuron_list, int index, int threshold, int reset_value);

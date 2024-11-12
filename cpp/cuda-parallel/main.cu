@@ -146,44 +146,51 @@ int main() {
         std::cout << "Packet number " << pak_idx + 1 << std::endl;
         std::vector<int> packet = RANC_packets[pak_idx];
         int spk_idx = 0;
+
+        // Load each packet into the network
         for (int x = 0; x < RANC->x_size; x++) {
             int index = x * RANC->y_size;
             for (int i = 0; i < RANC->d_RANC_network[index].axons_size; i++) {
-                RANC->d_RANC_network[index].d_queue[i] = packet[spk_idx++];  // Using d_queue instead of queue
+                RANC->d_RANC_network[index].d_queue[i] = packet[spk_idx++];
             }
             RANC->d_RANC_network[index].loadFromQueue();
         }
 
+        // Process each core in the network
         for (int y = 0; y < RANC->y_size; y++) {
             for (int x = 0; x < RANC->x_size; x++) {
-                int index = x * RANC->y_size + y;  // Linear indexing
+                int index = x * RANC->y_size + y;
                 if (!RANC->d_RANC_network[index].is_used) continue;
 
                 RANC->d_RANC_network[index].loadFromQueue();
+
                 if (!RANC->d_RANC_network[index].is_output_bus) {
+                    // Launch NeuronIntegrate in parallel for the entire core
+                    RANC->d_RANC_network[index].NeuronIntegrate(
+                        RANC->d_RANC_network[index].d_axons,
+                        RANC->d_RANC_network[index].d_connections
+                    );
+
+                    // Apply leak and fire operations sequentially
                     for (int neuron_idx = 0; neuron_idx < RANC->d_RANC_network[index].neurons_size; neuron_idx++) {
-                        for (int axon_idx = 0; axon_idx < RANC->d_RANC_network[index].axons_size; axon_idx++) {
-                            RANC->d_RANC_network[index].NeuronIntegrate(
-                                RANC->d_RANC_network[index].d_axons,
-                                RANC->d_RANC_network[index].d_connections,
-                                neuron_idx,
-                                axon_idx
-                            );
-                        }
                         RANC->d_RANC_network[index].NeuronLeak(neuron_idx, RANC_leak);
                         RANC->d_RANC_network[index].NeuronFire(RANC->d_RANC_network[index].d_neurons, neuron_idx, RANC_threshold, RANC_reset);
                     }
+
+                    // Transfer data to the next core
                     RANC->d_RANC_network[index].toNextCore();
                 } else {
+                    // Handle output bus core by copying axons to neurons
                     for (int i = 0; i < RANC->d_RANC_network[index].neurons_size; i++) {
-                        int output_index = output_bus_x * RANC->y_size + output_bus_y;  // Linear indexing for output bus
+                        int output_index = output_bus_x * RANC->y_size + output_bus_y;
                         RANC->d_RANC_network[output_index].d_neurons[i] = RANC->d_RANC_network[output_index].d_axons[i];
                     }
                 }
             }
         }
 
-        int output_index = output_bus_x * RANC->y_size + output_bus_y;  // Linear indexing for output bus
+        // Output results
+        int output_index = output_bus_x * RANC->y_size + output_bus_y;
         for (int i = 0; i < RANC->d_RANC_network[output_index].neurons_size; i++) {
             std::cout << RANC->d_RANC_network[output_index].d_neurons[i] << " ";
         }
