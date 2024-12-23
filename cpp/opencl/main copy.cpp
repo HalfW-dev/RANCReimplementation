@@ -162,14 +162,14 @@ int main() {
                 RANC->RANC_network[x][y].loadFromQueue();
                 if (!RANC->RANC_network[x][y].is_output_bus) {
                     for (int neuron_idx = 0; neuron_idx < RANC->RANC_network[x][y].neurons.size(); neuron_idx++) {
-                        for (int axon_idx = 0; axon_idx < RANC->RANC_network[x][y].axons.size(); axon_idx++) {
+                        //for (int axon_idx = 0; axon_idx < RANC->RANC_network[x][y].axons.size(); axon_idx++) {
                             RANC->RANC_network[x][y].NeuronIntegrate(
                                 RANC->RANC_network[x][y].axons,
                                 RANC->RANC_network[x][y].connections,
-                                neuron_idx,
-                                axon_idx
+                                neuron_idx
+                                //axon_idx
                             );
-                        }
+                        //}
                         RANC->RANC_network[x][y].NeuronLeak(neuron_idx, RANC_leak);
                         RANC->RANC_network[x][y].NeuronFire(RANC->RANC_network[x][y].neurons, neuron_idx, RANC_threshold, RANC_reset);
                     }

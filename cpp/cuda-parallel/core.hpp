@@ -13,6 +13,7 @@ public:
     int* d_neurons;       // Device pointer for neurons
     int* d_core_output;   // Device pointer for core output
     int* d_connections;   // Device pointer for connections (flattened 2D array)
+    int* d_potential;     // Device pointer for neuron potentials
 
     int queue_size;
     int axons_size;
@@ -38,8 +39,8 @@ public:
     // Leak method to adjust potential with a leak value using CUDA
     __host__ void NeuronLeak(int index, int leak_value);
 
-    // Integrate method now launches a kernel
-    __host__ void NeuronIntegrate(int* d_axon_list, int* d_weight_list);
+    // Integrate method for combining axon inputs and weights into the neuron potential using CUDA
+    __host__ void NeuronIntegrate(dim3 blocksPerGrid, dim3 threadsPerBlock);
 
     // Fire method to determine if a neuron should fire based on potential and threshold using CUDA
     __host__ void NeuronFire(int* d_neuron_list, int index, int threshold, int reset_value);
@@ -53,3 +54,7 @@ public:
     // Print method to output Core details
     __host__ __device__ void print() const;
 };
+
+// CUDA kernel declaration for neuron integration
+__global__ void NeuronIntegrateKernel(
+    int* d_axons, int* d_connections, int* d_potential, int neurons_size, int axons_size);

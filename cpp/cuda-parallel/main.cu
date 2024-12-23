@@ -147,7 +147,7 @@ int main() {
         std::vector<int> packet = RANC_packets[pak_idx];
         int spk_idx = 0;
 
-        // Load each packet into the network
+        // Load packet data into queues
         for (int x = 0; x < RANC->x_size; x++) {
             int index = x * RANC->y_size;
             for (int i = 0; i < RANC->d_RANC_network[index].axons_size; i++) {
@@ -156,7 +156,7 @@ int main() {
             RANC->d_RANC_network[index].loadFromQueue();
         }
 
-        // Process each core in the network
+        // Process cores in the network
         for (int y = 0; y < RANC->y_size; y++) {
             for (int x = 0; x < RANC->x_size; x++) {
                 int index = x * RANC->y_size + y;
@@ -165,22 +165,31 @@ int main() {
                 RANC->d_RANC_network[index].loadFromQueue();
 
                 if (!RANC->d_RANC_network[index].is_output_bus) {
-                    // Launch NeuronIntegrate in parallel for the entire core
-                    RANC->d_RANC_network[index].NeuronIntegrate(
-                        RANC->d_RANC_network[index].d_axons,
-                        RANC->d_RANC_network[index].d_connections
-                    );
+                    // Reset d_potential before launching the kernel
+                    cudaMemset(RANC->d_RANC_network[index].d_potential, 0, 
+                            RANC->d_RANC_network[index].neurons_size * sizeof(int));
 
-                    // Apply leak and fire operations sequentially
+                    // Calculate thread and block dimensions
+                    dim3 threadsPerBlock(256);
+                    dim3 blocksPerGrid((RANC->d_RANC_network[index].neurons_size * 
+                                        RANC->d_RANC_network[index].axons_size + threadsPerBlock.x - 1) / threadsPerBlock.x);
+
+                    // Launch NeuronIntegrate kernel
+                    RANC->d_RANC_network[index].NeuronIntegrate(blocksPerGrid, threadsPerBlock);
+
+                    cudaDeviceSynchronize();
+
+                    // Apply sequential operations
                     for (int neuron_idx = 0; neuron_idx < RANC->d_RANC_network[index].neurons_size; neuron_idx++) {
                         RANC->d_RANC_network[index].NeuronLeak(neuron_idx, RANC_leak);
-                        RANC->d_RANC_network[index].NeuronFire(RANC->d_RANC_network[index].d_neurons, neuron_idx, RANC_threshold, RANC_reset);
+                        RANC->d_RANC_network[index].NeuronFire(
+                            RANC->d_RANC_network[index].d_neurons, neuron_idx, RANC_threshold, RANC_reset);
                     }
 
                     // Transfer data to the next core
                     RANC->d_RANC_network[index].toNextCore();
                 } else {
-                    // Handle output bus core by copying axons to neurons
+                    // Handle output bus core
                     for (int i = 0; i < RANC->d_RANC_network[index].neurons_size; i++) {
                         int output_index = output_bus_x * RANC->y_size + output_bus_y;
                         RANC->d_RANC_network[output_index].d_neurons[i] = RANC->d_RANC_network[output_index].d_axons[i];
