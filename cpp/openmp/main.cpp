@@ -10,6 +10,7 @@
 #include <chrono>   // For measuring execution time
 
 int main() {
+    
     auto start = std::chrono::high_resolution_clock::now(); // Start timer
 
     int RANC_x;
@@ -166,6 +167,8 @@ int main() {
 
                 RANC->RANC_network[x][y].loadFromQueue();
                 if (!RANC->RANC_network[x][y].is_output_bus) {
+                    #pragma omp_set_dynamic(0);
+                    #pragma omp parallel for collapse(1) reduction(+:integrate_total_time, integrate_count) num_threads(9) 
                     for (int neuron_idx = 0; neuron_idx < RANC->RANC_network[x][y].neurons.size(); neuron_idx++) {
                         for (int axon_idx = 0; axon_idx < RANC->RANC_network[x][y].axons.size(); axon_idx++) {
                             auto integrate_start = std::chrono::high_resolution_clock::now();
@@ -176,21 +179,17 @@ int main() {
                                 axon_idx
                             );
                             auto integrate_end = std::chrono::high_resolution_clock::now();
+                            
+                            #pragma omp atomic
                             integrate_total_time += std::chrono::duration<double>(integrate_end - integrate_start).count();
+                            
+                            #pragma omp atomic
                             integrate_count++;
                         }
 
-                        auto leak_start = std::chrono::high_resolution_clock::now();
                         RANC->RANC_network[x][y].NeuronLeak(neuron_idx, RANC_leak);
-                        auto leak_end = std::chrono::high_resolution_clock::now();
-                        leak_total_time += std::chrono::duration<double>(leak_end - leak_start).count();
-                        leak_count++;
-
-                        auto fire_start = std::chrono::high_resolution_clock::now();
                         RANC->RANC_network[x][y].NeuronFire(RANC->RANC_network[x][y].neurons, neuron_idx, RANC_threshold, RANC_reset);
-                        auto fire_end = std::chrono::high_resolution_clock::now();
-                        fire_total_time += std::chrono::duration<double>(fire_end - fire_start).count();
-                        fire_count++;
+                        
                     }
                     RANC->RANC_network[x][y].toNextCore();
                 }
@@ -216,10 +215,6 @@ int main() {
     std::chrono::duration<double> total_duration = processing_end - start;
     std::cout << "Processing time: " << processing_duration.count() << " seconds" << std::endl;
     std::cout << "Total execution time: " << total_duration.count() << " seconds" << std::endl;
-
-    std::cout << "NeuronIntegrate total time: " << integrate_total_time << " seconds, average time: " << integrate_total_time / integrate_count << " seconds" << std::endl;
-    std::cout << "NeuronFire total time: " << fire_total_time << " seconds, average time: " << fire_total_time / fire_count << " seconds" << std::endl;
-    std::cout << "NeuronLeak total time: " << leak_total_time << " seconds, average time: " << leak_total_time / leak_count << " seconds" << std::endl;
 
     output_file.close();
     delete RANC;

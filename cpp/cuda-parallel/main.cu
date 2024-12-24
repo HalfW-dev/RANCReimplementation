@@ -120,6 +120,9 @@ int main() {
     RANC->setNextCores(topo_line_2d_vector);
     auto initialization_end = std::chrono::high_resolution_clock::now();
 
+    int tpb_num = 1024;
+    std::cout << "ThreadsPerBlock: " << tpb_num << std::endl;
+
     std::chrono::duration<double> initialization_duration = initialization_end - initialization_start;
     std::cout << "Initialization time: " << initialization_duration.count() << " seconds" << std::endl;
 
@@ -134,7 +137,7 @@ int main() {
         }
     }
 
-    std::ofstream output_file("./output/cpp_output.txt");
+    std::ofstream output_file("./output/cpp_output_100.txt");
     if (!output_file.is_open()) {
         std::cerr << "Failed to open the output file: " << std::endl;
         return -1;
@@ -143,7 +146,7 @@ int main() {
     // Main processing loop
     auto processing_start = std::chrono::high_resolution_clock::now();
     for (int pak_idx = 0; pak_idx < RANC_packets.size(); pak_idx++) {
-        std::cout << "Packet number " << pak_idx + 1 << std::endl;
+        //std::cout << "Packet number " << pak_idx + 1 << std::endl;
         std::vector<int> packet = RANC_packets[pak_idx];
         int spk_idx = 0;
 
@@ -170,7 +173,7 @@ int main() {
                             RANC->d_RANC_network[index].neurons_size * sizeof(int));
 
                     // Calculate thread and block dimensions
-                    dim3 threadsPerBlock(256);
+                    dim3 threadsPerBlock(tpb_num);
                     dim3 blocksPerGrid((RANC->d_RANC_network[index].neurons_size * 
                                         RANC->d_RANC_network[index].axons_size + threadsPerBlock.x - 1) / threadsPerBlock.x);
 
@@ -200,10 +203,10 @@ int main() {
 
         // Output results
         int output_index = output_bus_x * RANC->y_size + output_bus_y;
-        for (int i = 0; i < RANC->d_RANC_network[output_index].neurons_size; i++) {
-            std::cout << RANC->d_RANC_network[output_index].d_neurons[i] << " ";
-        }
-        std::cout << std::endl;
+        // for (int i = 0; i < RANC->d_RANC_network[output_index].neurons_size; i++) {
+        //     std::cout << RANC->d_RANC_network[output_index].d_neurons[i] << " ";
+        // }
+        // std::cout << std::endl;
 
         for (int i = 0; i < RANC->d_RANC_network[output_index].neurons_size; i++) {
             output_file << RANC->d_RANC_network[output_index].d_neurons[i] << " ";

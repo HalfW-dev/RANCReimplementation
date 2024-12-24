@@ -94,9 +94,9 @@ void NeuronBlock::Integrate(
     clEnqueueWriteBuffer(queue, buffer_axon, CL_TRUE, 0, sizeof(int) * numAxons, axon_list.data(), 0, nullptr, nullptr);
     clEnqueueWriteBuffer(queue, buffer_weight, CL_TRUE, 0, sizeof(int) * flattened_weights.size(), flattened_weights.data(), 0, nullptr, nullptr);
 
-    size_t globalSize = ((numNeurons + 63) / 64) * 64; // Align globalSize to a multiple of localSize
-    size_t localSize = 64; // Define work-items per group
-
+    size_t localSize = (numAxons * numNeurons) / 256; // Define work-items per group
+    size_t globalSize = numAxons * numNeurons; // Align globalSize to a multiple of localSize
+    
     // Set kernel arguments
     clSetKernelArg(kernel, 0, sizeof(cl_mem), &buffer_axon);
     clSetKernelArg(kernel, 1, sizeof(cl_mem), &buffer_weight);

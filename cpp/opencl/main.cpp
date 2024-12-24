@@ -142,6 +142,9 @@ int main() {
         return -1;
     }
 
+    std::cout << "Global size: 16384 " << std::endl;
+    std::cout << "Local size: 64 " << std::endl;
+
     // Main processing loop
     auto processing_start = std::chrono::high_resolution_clock::now();
     for (int pak_idx = 0; pak_idx < RANC_packets.size(); pak_idx++) {
